@@ -108,6 +108,20 @@ test("z.stringFormat", () => {
   );
 });
 
+test("z.stringFormat async predicate", async () => {
+  const asyncFmt = z.stringFormat("custom", async (val) => val === "ok");
+  expect(await asyncFmt.safeParseAsync("ok")).toEqual({ success: true, data: "ok" });
+  const bad = await asyncFmt.safeParseAsync("bad");
+  expect(bad.success).toBe(false);
+  expect(bad.error?.issues[0]).toMatchObject({ code: "invalid_format", format: "custom" });
+  expect(() => asyncFmt.safeParse("bad")).toThrow(z.core.$ZodAsyncError);
+
+  const promiseFmt = z.stringFormat("custom", (val) => Promise.resolve(val === "ok"));
+  expect((await promiseFmt.safeParseAsync("ok")).success).toBe(true);
+  expect((await promiseFmt.safeParseAsync("bad")).success).toBe(false);
+  expect(() => promiseFmt.safeParse("bad")).toThrow(z.core.$ZodAsyncError);
+});
+
 test("z.hex", () => {
   const hexSchema = z.hex();
 
