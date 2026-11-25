@@ -1271,20 +1271,35 @@ export interface $ZodCustomStringFormat<Format extends string = string> extends 
   _zod: $ZodCustomStringFormatInternals<Format>;
 }
 
+function handleCustomStringFormatResult(
+  result: unknown,
+  payload: ParsePayload<string>,
+  input: string,
+  inst: $ZodCustomStringFormat,
+  def: $ZodCustomStringFormatDef
+): void {
+  if (result) return;
+  payload.issues.push({
+    code: "invalid_format",
+    format: def.format,
+    input,
+    inst,
+    continue: !def.abort,
+  });
+}
+
 export const $ZodCustomStringFormat: core.$constructor<$ZodCustomStringFormat> = /*@__PURE__*/ core.$constructor(
   "$ZodCustomStringFormat",
   (inst, def): void => {
     $ZodStringFormat.init(inst, def);
     inst._zod.check = (payload) => {
-      if (def.fn(payload.value)) return;
-
-      payload.issues.push({
-        code: "invalid_format",
-        format: def.format,
-        input: payload.value,
-        inst,
-        continue: !def.abort,
-      });
+      const input = payload.value;
+      const result = def.fn(input);
+      if (result instanceof Promise) {
+        return result.then((resolved) => handleCustomStringFormatResult(resolved, payload, input, inst, def));
+      }
+      handleCustomStringFormatResult(result, payload, input, inst, def);
+      return;
     };
   }
 );

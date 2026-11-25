@@ -1278,6 +1278,18 @@ test("ZodCompileAsyncError thrown on async transform", () => {
   expect(() => compile(schema, { strict: true })).toThrow(ZodCompileAsyncError);
 });
 
+test("async and Promise-returning stringFormat predicates", async () => {
+  const asyncFmt = z.stringFormat("custom", async (v) => v === "ok");
+  expect(() => compile(z.union([asyncFmt, z.string()]), { strict: true })).toThrow(ZodCompileAsyncError);
+
+  const promiseFmt = z.stringFormat("custom", (v) => Promise.resolve(v === "ok"));
+  const compiled = compile(promiseFmt);
+  expect((await compiled.safeParseAsync("ok")).success).toBe(true);
+  expect((await compiled.safeParseAsync("bad")).success).toBe(false);
+  expect(() => compiled.safeParse("ok")).toThrow($ZodAsyncError);
+  expect(() => compile(z.union([promiseFmt, z.string()])).safeParse("ok")).toThrow($ZodAsyncError);
+});
+
 test("compiled clone is composable inside another schema", () => {
   const inner = z.object({ name: z.string() });
   const compiledInner = compile(inner);
@@ -1649,6 +1661,7 @@ function refusedCases(): [string, z.ZodType, unknown[]][] {
     ["async refine", z.string().refine(async () => true), ["a", 1]],
     ["async transform", z.string().transform(async (s) => s.length), ["a", 1]],
     ["async custom", z.custom(async () => true), ["a"]],
+    ["async stringFormat", z.stringFormat("custom", async () => true), ["a", 1]],
     ["xor", z.xor([z.string(), z.number()]), ["a", 1, true]],
     ["coerce", z.coerce.number(), ["5", 5, Symbol("x")]],
     ["catch callback", z.catch(z.string().min(5), (c) => `bad:${c.error.issues.length}`), ["hello world", "hi", 42]],
